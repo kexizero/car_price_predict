@@ -2,11 +2,12 @@
 import warnings
 
 from tensorflow.python.keras.callbacks import LearningRateScheduler
+# from tensorflow_core.python.keras.callbacks import LearningRateScheduler
 
 warnings.filterwarnings('ignore')
 import tensorflow as tf
 import tensorflow.keras.backend as K
-# from tensorflow_core.python.keras.callbacks import LearningRateScheduler
+
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import KFold
@@ -24,6 +25,7 @@ Test_NN_data = pd.read_csv(tree_data_path+'test_nn.csv', sep=' ')
 
 numerical_cols = Train_NN_data.columns
 feature_cols = [col for col in numerical_cols if col not in ['price','SaleID']]
+
 ## 提取特征列，标签列构造训练样本和测试样本
 X_data = Train_NN_data[feature_cols]
 X_test = Test_NN_data[feature_cols]
@@ -37,7 +39,6 @@ x_test = np.array(X_test)
 #调整训练过程的学习率
 def scheduler(epoch):
     # 到规定的epoch，学习率减小为原来的1/10
-
     if epoch  == 1400 :
         lr = K.get_value(model.optimizer.lr)
         K.set_value(model.optimizer.lr, lr * 0.1)
@@ -54,11 +55,15 @@ def scheduler(epoch):
 
 reduce_lr = LearningRateScheduler(scheduler)
 
+# 输出日志，TensorBoard可视化
+tensorboard = tf.keras.callbacks.TensorBoard(log_dir='./logs', histogram_freq=1, write_grads=True, write_images=True)
+
 
 kfolder = KFold(n_splits=5, shuffle=True, random_state=2018)
 oof_nn = np.zeros(len(x))
 predictions_nn = np.zeros(len(x_test))
 predictions_train_nn = np.zeros(len(x))
+# 返回分类后数据集index
 kfold = kfolder.split(x, y)
 fold_ = 0
 for train_index, vali_index in kfold:
@@ -78,7 +83,7 @@ for train_index, vali_index in kfold:
                     optimizer=tf.keras.optimizers.Adam(),
                   metrics=['mae'])
 
-    model.fit(k_x_train,k_y_train,batch_size =512,epochs=2000,validation_data=(k_x_vali, k_y_vali), callbacks=[reduce_lr])#callbacks=callbacks,
+    model.fit(k_x_train,k_y_train,batch_size =512,epochs=2000,validation_data=(k_x_vali, k_y_vali), callbacks=[reduce_lr, tensorboard])
     oof_nn[vali_index] = model.predict(k_x_vali).reshape((model.predict(k_x_vali).shape[0],))
     predictions_nn += model.predict(x_test).reshape((model.predict(x_test).shape[0],)) / kfolder.n_splits
     predictions_train_nn += model.predict(x).reshape((model.predict(x).shape[0],)) / kfolder.n_splits
